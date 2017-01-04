@@ -1,46 +1,61 @@
 package crypto
 
 import (
+	"github.com/lucas-clemente/quic-go/protocol"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Crypto/NullAEAD", func() {
+	aad := []byte("All human beings are born free and equal in dignity and rights.")
+	plainText := []byte("They are endowed with reason and conscience and should act towards one another in a spirit of brotherhood.")
+	hash36 := []byte{0x98, 0x9b, 0x33, 0x3f, 0xe8, 0xde, 0x32, 0x5c, 0xa6, 0x7f, 0x9c, 0xf7}
+	// hash for the message signed by the client
+	hash37Client := []byte{0x9f, 0xc0, 0xf1, 0xb6, 0xbb, 0x0, 0x26, 0x1, 0x9, 0xc1, 0x1a, 0x58}
+	// hash for the message signed by the server
+	hash37Server := []byte{0x3b, 0x71, 0x6f, 0x43, 0x79, 0x41, 0xef, 0x0, 0x9, 0xc1, 0x1a, 0x72}
+
 	It("opens", func() {
-		aad := []byte("All human beings are born free and equal in dignity and rights.")
-		plainText := []byte("They are endowed with reason and conscience and should act towards one another in a spirit of brotherhood.")
-		hash := []byte{0x98, 0x9b, 0x33, 0x3f, 0xe8, 0xde, 0x32, 0x5c, 0xa6, 0x7f, 0x9c, 0xf7}
-		cipherText := append(hash, plainText...)
-		aead := &NullAEAD{}
+		cipherText := append(hash36, plainText...)
+		aead := NewNullAEAD(protocol.Version36)
+		res, err := aead.Open(nil, cipherText, 0, aad)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(Equal([]byte("They are endowed with reason and conscience and should act towards one another in a spirit of brotherhood.")))
+	})
+
+	It("opens, for QUIC version >= 37", func() {
+		cipherText := append(hash37Client, plainText...)
+		aead := NewNullAEAD(protocol.Version37)
 		res, err := aead.Open(nil, cipherText, 0, aad)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res).To(Equal([]byte("They are endowed with reason and conscience and should act towards one another in a spirit of brotherhood.")))
 	})
 
 	It("fails", func() {
-		aad := []byte("All human beings are born free and equal in dignity and rights..")
-		plainText := []byte("They are endowed with reason and conscience and should act towards one another in a spirit of brotherhood.")
-		hash := []byte{0x98, 0x9b, 0x33, 0x3f, 0xe8, 0xde, 0x32, 0x5c, 0xa6, 0x7f, 0x9c, 0xf7}
-		cipherText := append(hash, plainText...)
-		aead := &NullAEAD{}
+		cipherText := append(append(hash36, plainText...), byte(0x42))
+		aead := NewNullAEAD(protocol.Version36)
 		_, err := aead.Open(nil, cipherText, 0, aad)
 		Expect(err).To(HaveOccurred())
 	})
 
 	It("seals", func() {
-		aad := []byte("All human beings are born free and equal in dignity and rights.")
-		plainText := []byte("They are endowed with reason and conscience and should act towards one another in a spirit of brotherhood.")
-		aead := &NullAEAD{}
-		Expect(aead.Seal(nil, plainText, 0, aad)).To(Equal(append([]byte{0x98, 0x9b, 0x33, 0x3f, 0xe8, 0xde, 0x32, 0x5c, 0xa6, 0x7f, 0x9c, 0xf7}, []byte("They are endowed with reason and conscience and should act towards one another in a spirit of brotherhood.")...)))
+		aead := NewNullAEAD(protocol.Version36)
+		Expect(aead.Seal(nil, plainText, 0, aad)).To(Equal(append(hash36, []byte("They are endowed with reason and conscience and should act towards one another in a spirit of brotherhood.")...)))
+	})
+
+	It("seals, for QUIC version >= 37", func() {
+		aead := NewNullAEAD(protocol.Version37)
+		Expect(aead.Seal(nil, plainText, 0, aad)).To(Equal(append(hash37Server, []byte("They are endowed with reason and conscience and should act towards one another in a spirit of brotherhood.")...)))
 	})
 
 	It("rejects short ciphertexts", func() {
-		_, err := NullAEAD{}.Open(nil, nil, 0, nil)
+		aead := NewNullAEAD(protocol.Version36)
+		_, err := aead.Open(nil, nil, 0, nil)
 		Expect(err).To(MatchError("NullAEAD: ciphertext cannot be less than 12 bytes long"))
 	})
 
 	It("seals in-place", func() {
-		aead := &NullAEAD{}
+		aead := NewNullAEAD(protocol.Version36)
 		buf := make([]byte, 6, 12+6)
 		copy(buf, []byte("foobar"))
 		res := aead.Seal(buf[0:0], buf, 0, nil)

@@ -79,7 +79,8 @@ var _ = Describe("Server", func() {
 		})
 
 		It("closes and deletes sessions", func() {
-			err := server.handlePacket(nil, nil, append(firstPacket, (&crypto.NullAEAD{}).Seal(nil, nil, 0, firstPacket)...))
+			nullAEAD := crypto.NewNullAEAD(protocol.VersionWhatever)
+			err := server.handlePacket(nil, nil, append(firstPacket, nullAEAD.Seal(nil, nil, 0, firstPacket)...))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(server.sessions).To(HaveLen(1))
 			server.closeCallback(0x4cfa9f9b668619f6)

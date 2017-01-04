@@ -28,6 +28,7 @@ type CryptoSetup struct {
 	scfg                 *ServerConfig
 	diversificationNonce []byte
 
+	nullAEAD                    crypto.AEAD
 	secureAEAD                  crypto.AEAD
 	forwardSecureAEAD           crypto.AEAD
 	receivedForwardSecurePacket bool
@@ -63,6 +64,7 @@ func NewCryptoSetup(
 		scfg:                 scfg,
 		keyDerivation:        crypto.DeriveKeysAESGCM,
 		keyExchange:          getEphermalKEX,
+		nullAEAD:             crypto.NewNullAEAD(version),
 		cryptoStream:         cryptoStream,
 		connectionParameters: connectionParameters,
 		aeadChanged:          aeadChanged,
@@ -171,7 +173,7 @@ func (h *CryptoSetup) Open(dst, src []byte, packetNumber protocol.PacketNumber, 
 			return nil, err
 		}
 	}
-	return (&crypto.NullAEAD{}).Open(dst, src, packetNumber, associatedData)
+	return h.nullAEAD.Open(dst, src, packetNumber, associatedData)
 }
 
 // Seal a message, call LockForSealing() before!
@@ -181,7 +183,7 @@ func (h *CryptoSetup) Seal(dst, src []byte, packetNumber protocol.PacketNumber, 
 	} else if h.secureAEAD != nil {
 		return h.secureAEAD.Seal(dst, src, packetNumber, associatedData)
 	} else {
-		return (&crypto.NullAEAD{}).Seal(dst, src, packetNumber, associatedData)
+		return h.nullAEAD.Seal(dst, src, packetNumber, associatedData)
 	}
 }
 

@@ -8,13 +8,20 @@ import (
 	"github.com/lucas-clemente/quic-go/protocol"
 )
 
-// NullAEAD handles not-yet encrypted packets
-type NullAEAD struct{}
+// nullAEAD handles not-yet encrypted packets
+type nullAEAD struct {
+	version protocol.VersionNumber
+}
 
-var _ AEAD = &NullAEAD{}
+var _ AEAD = &nullAEAD{}
+
+// NewNullAEAD creates a NullAEAD
+func NewNullAEAD(v protocol.VersionNumber) AEAD {
+	return &nullAEAD{version: v}
+}
 
 // Open and verify the ciphertext
-func (NullAEAD) Open(dst, src []byte, packetNumber protocol.PacketNumber, associatedData []byte) ([]byte, error) {
+func (n *nullAEAD) Open(dst, src []byte, packetNumber protocol.PacketNumber, associatedData []byte) ([]byte, error) {
 	if len(src) < 12 {
 		return nil, errors.New("NullAEAD: ciphertext cannot be less than 12 bytes long")
 	}
@@ -22,6 +29,9 @@ func (NullAEAD) Open(dst, src []byte, packetNumber protocol.PacketNumber, associ
 	hash := fnv128a.New()
 	hash.Write(associatedData)
 	hash.Write(src[12:])
+	if n.version >= protocol.Version37 {
+		hash.Write([]byte("Client"))
+	}
 	testHigh, testLow := hash.Sum128()
 
 	low := binary.LittleEndian.Uint64(src)
@@ -34,7 +44,7 @@ func (NullAEAD) Open(dst, src []byte, packetNumber protocol.PacketNumber, associ
 }
 
 // Seal writes hash and ciphertext to the buffer
-func (NullAEAD) Seal(dst, src []byte, packetNumber protocol.PacketNumber, associatedData []byte) []byte {
+func (n *nullAEAD) Seal(dst, src []byte, packetNumber protocol.PacketNumber, associatedData []byte) []byte {
 	if cap(dst) < 12+len(src) {
 		dst = make([]byte, 12+len(src))
 	} else {
@@ -44,6 +54,11 @@ func (NullAEAD) Seal(dst, src []byte, packetNumber protocol.PacketNumber, associ
 	hash := fnv128a.New()
 	hash.Write(associatedData)
 	hash.Write(src)
+
+	if n.version >= protocol.Version37 {
+		hash.Write([]byte("Server"))
+	}
+
 	high, low := hash.Sum128()
 
 	copy(dst[12:], src)

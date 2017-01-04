@@ -2,7 +2,10 @@ package quic
 
 import (
 	"bytes"
+	"reflect"
+	"unsafe"
 
+	"github.com/lucas-clemente/quic-go/crypto"
 	"github.com/lucas-clemente/quic-go/frames"
 	"github.com/lucas-clemente/quic-go/handshake"
 	"github.com/lucas-clemente/quic-go/protocol"
@@ -32,6 +35,7 @@ var _ = Describe("Packet packer", func() {
 			packetNumberGenerator: newPacketNumberGenerator(protocol.SkipPacketAveragePeriodLength),
 			streamFramer:          streamFramer,
 		}
+		*(*crypto.AEAD)(unsafe.Pointer(reflect.ValueOf(packer.cryptoSetup).Elem().FieldByName("nullAEAD").UnsafeAddr())) = crypto.NewNullAEAD(protocol.VersionWhatever)
 		publicHeaderLen = 1 + 8 + 2 // 1 flag byte, 8 connection ID, 2 packet number
 		packer.version = protocol.Version34
 	})

@@ -23,7 +23,7 @@ var _ = Describe("Packet unpacker", func() {
 	)
 
 	BeforeEach(func() {
-		aead = &crypto.NullAEAD{}
+		aead = crypto.NewNullAEAD(protocol.VersionWhatever)
 		hdr = &PublicHeader{
 			PacketNumber:    10,
 			PacketNumberLen: 1,
